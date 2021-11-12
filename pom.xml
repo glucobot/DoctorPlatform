@@ -61,7 +61,7 @@
                         <id>default-cli</id>
                         <configuration>
                             <mainClass>
-                                glucobot.doctorplatform.doctorplatform/glucobot.doctorplatform.doctorplatform.HelloApplication
+                                glucobot.doctorplatform.doctorplatform/glucobot.doctorplatform.Main
                             </mainClass>
                         </configuration>
                     </execution>

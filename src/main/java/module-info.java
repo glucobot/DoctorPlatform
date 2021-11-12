@@ -4,6 +4,8 @@ module glucobot.doctorplatform.doctorplatform {
     requires javafx.graphics;
 
 
-    opens glucobot.doctorplatform.doctorplatform to javafx.fxml;
-    exports glucobot.doctorplatform.doctorplatform;
+    opens glucobot.doctorplatform to javafx.fxml;
+    exports glucobot.doctorplatform;
+    exports glucobot.doctorplatform.controller;
+    opens glucobot.doctorplatform.controller to javafx.fxml;
 }
