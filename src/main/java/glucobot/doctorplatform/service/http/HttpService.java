@@ -1,90 +1,114 @@
 package glucobot.doctorplatform.service.http;
 
-import java.io.BufferedReader;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import glucobot.doctorplatform.service.DI;
+import glucobot.doctorplatform.service.http.exceptions.NotFoundException;
+import glucobot.doctorplatform.service.http.exceptions.UnauthorizedException;
+
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.net.HttpURLConnection;
 import java.net.URI;
-import java.net.URL;
-import java.util.Iterator;
-import java.util.List;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.util.HashMap;
+import java.util.Map;
 
 public class HttpService {
 
+    private static final int NOT_FOUND = 404;
+    private static final int UNAUTHORIZED = 401;
+
     private final URI baseURI;
-    private final HttpAuthorizationProvider authorizationProvider;
+    private final ObjectMapper objectMapper;
 
-    public HttpService(String baseURI, HttpAuthorizationProvider authorizationProvider) {
+    public HttpService(String baseURI) {
         this.baseURI = URI.create(baseURI);
-        this.authorizationProvider = authorizationProvider;
+        objectMapper = new ObjectMapper();
     }
 
-    public <T> T get(String action, Class<T> TClass) throws IOException {
-        URL url = baseURI.resolve("/" + action).toURL();
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod("GET");
+    public <T> T get(String action, Map<String, String> params, Class<T> TClass) throws IOException, InterruptedException {
+        HttpClient client = createHttpClient();
 
-        // Add parameters
+        HttpRequest request = createRequestBuilder(action, params)
+                .build();
 
-        connection.setRequestProperty("Content-Type", "application/json");
-        connection.setRequestProperty("Authorization", authorizationProvider.getHeader());
+        HttpResponse<String> response = sendRequest(client, request);
 
-        HttpResponse response = getFullResponse(connection);
-
-        //T result = new ObjectMapper().readValue(response.getBody(), TClass);
-        return null;
-
+        return objectMapper.readValue(response.body(), TClass);
     }
 
-    private HttpResponse getFullResponse(HttpURLConnection connection) throws IOException {
-        HttpResponse response = new HttpResponse();
+    public <T> T get(String action, Class<T> TClass) throws IOException, InterruptedException {
+        return this.get(action, new HashMap<>(), TClass);
+    }
 
-        response.setStatusCode(connection.getResponseCode());
-        response.setResponseMessage(connection.getResponseMessage());
+    public <T> T post(String action, Object data, Class<T> TClass) throws IOException, InterruptedException {
+        HttpClient client = createHttpClient();
 
-        StringBuilder headersStringBuilder = new StringBuilder();
+        HttpRequest request = createRequestBuilder(action)
+                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(data)))
+                .build();
 
-        // read headers
-        connection.getHeaderFields().entrySet().stream()
-                .filter(entry -> entry.getKey() != null)
-                .forEach(entry -> {
-                    headersStringBuilder.append(entry.getKey()).append(": ");
-                    List<String> headerValues = entry.getValue();
-                    Iterator<String> it = headerValues.iterator();
-                    if (it.hasNext()) {
-                        headersStringBuilder.append(it.next());
-                        while (it.hasNext()) {
-                            headersStringBuilder.append(", ").append(it.next());
-                        }
-                    }
-                    headersStringBuilder.append("\n");
-                });
+        HttpResponse<String> response = sendRequest(client, request);
 
-        response.setHeaders(headersStringBuilder.toString());
+        return new ObjectMapper().readValue(response.body(), TClass);
+    }
 
+    public <T> T post(String action, Class<T> TClass) throws IOException, InterruptedException {
+        return this.post(action, null, TClass);
+    }
 
-        // read response content
-        StringBuilder bodyStringBuilder = new StringBuilder();
+    private HttpResponse<String> sendRequest(HttpClient client, HttpRequest request) throws IOException, InterruptedException {
+        HttpResponse<java.lang.String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-        Reader streamReader;
+        switch (response.statusCode()) {
+            case NOT_FOUND:
+                throw new NotFoundException(response.body());
+            case UNAUTHORIZED:
+                throw new UnauthorizedException(response.body());
 
-        if (response.getStatusCode() > 299) {
-            streamReader = new InputStreamReader(connection.getErrorStream());
-        } else {
-            streamReader = new InputStreamReader(connection.getInputStream());
+            default:
+                return response;
+        }
+    }
+
+    private HttpClient createHttpClient() {
+        return HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_2)
+                .build();
+    }
+
+    private HttpRequest.Builder createRequestBuilder(String action) {
+        return createRequestBuilder(action, new HashMap<>());
+    }
+
+    private HttpRequest.Builder createRequestBuilder(String action, Map<String, String> params) {
+        HttpAuthorizationProvider authorizationProvider = DI.get(HttpAuthorizationProvider.class);
+
+        URI uri = baseURI.resolve("/" + action + "/");
+
+        if (params.size() != 0) {
+            String paramsQuery = evaluateQueryParams(params);
+            uri = uri.resolve("?" + paramsQuery);
         }
 
-        BufferedReader in = new BufferedReader(streamReader);
-        String inputLine;
-        while ((inputLine = in.readLine()) != null) {
-            bodyStringBuilder.append(inputLine);
-        }
-        in.close();
-        connection.disconnect();
-
-        response.setBody(bodyStringBuilder.toString());
-
-        return response;
+        return HttpRequest.newBuilder()
+                .uri(uri.normalize())
+                .header("Content-Type", "application/json")
+                .header("Authorization", authorizationProvider.getHeader());
     }
+
+    private String evaluateQueryParams(Map<String, String> params) {
+        StringBuilder sb = new StringBuilder();
+
+        int i = 0;
+        for (var param : params.entrySet()) {
+            sb.append(param.getKey()).append("=").append(param.getValue());
+            if (i < params.size() - 1)
+                sb.append("&");
+            i++;
+        }
+
+        return sb.toString();
+    }
+
 }
