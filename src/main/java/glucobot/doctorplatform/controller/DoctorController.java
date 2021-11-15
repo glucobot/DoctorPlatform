@@ -29,7 +29,7 @@ import java.util.*;
 
 public class DoctorController implements Initializable {
 
-    private static final long UPDATE_INTERVAL = 10;
+    private static final long UPDATE_INTERVAL = 5;
 
     @FXML
     public TableView<User> patientsTable;
@@ -95,27 +95,22 @@ public class DoctorController implements Initializable {
             }
         });
 
-        XYChart.Series<Double, Double> insulinSeries = new XYChart.Series<>();
-        insulinSeries.setName("Insulin");
-
         XYChart.Series<Double, Double> glycemiaSeries = new XYChart.Series<>();
         glycemiaSeries.setName("Glycemia");
+        chart.getData().addAll(glycemiaSeries);
 
-        chart.getData().addAll(glycemiaSeries, insulinSeries);
-
-        updateChartTask = new UpdateChartTask(insulinSeries, glycemiaSeries);
+        updateChartTask = new UpdateChartTask(glycemiaSeries);
         updateChartTask.setPeriod(Duration.seconds(UPDATE_INTERVAL));
         updateChartTask.setOnSucceeded(e -> {
+
                     MeasureCollection measureCollection = updateChartTask.getValue();
 
                     for (Measure measure : measureCollection.getMeasures()) {
-                        insulinSeries.getData().add(new XYChart.Data<>(measure.getTimestamp(), measure.getInsulin()));
                         glycemiaSeries.getData().add(new XYChart.Data<>(measure.getTimestamp(), measure.getGlycemia()));
                     }
                 }
         );
     }
-
 
     private void populatePatients(User... patients) {
         var items = patientsTable.getItems();
@@ -174,15 +169,13 @@ public class DoctorController implements Initializable {
 
         private User user;
         private String lastTimestamp;
-        private final XYChart.Series<Double, Double> insulinSeries;
         private final XYChart.Series<Double, Double> glycemiaSeries;
 
         private final PatientService patientService;
 
-        public UpdateChartTask(XYChart.Series<Double, Double> insulinSeries, XYChart.Series<Double, Double> glycemiaSeries) {
+        public UpdateChartTask(XYChart.Series<Double, Double> glycemiaSeries) {
             patientService = DI.get(PatientService.class);
 
-            this.insulinSeries = insulinSeries;
             this.glycemiaSeries = glycemiaSeries;
 
         }
@@ -196,7 +189,6 @@ public class DoctorController implements Initializable {
             format.setTimeZone(TimeZone.getTimeZone("UTC"));
             this.lastTimestamp = format.format(calendar.getTime());
 
-            insulinSeries.getData().clear();
             glycemiaSeries.getData().clear();
 
             this.reset();

@@ -26,18 +26,24 @@
     </BorderPane>
     <HBox prefHeight="100.0" prefWidth="200.0" spacing="2.0" VBox.vgrow="ALWAYS">
         <children>
-            <TableView fx:id="patientsTable" prefHeight="325.0" prefWidth="151.0" HBox.hgrow="ALWAYS">
+            <TableView fx:id="patientsTable" maxWidth="150.0" minWidth="150.0" prefWidth="150.0" HBox.hgrow="NEVER">
                 <columnResizePolicy>
                     <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                 </columnResizePolicy>
             </TableView>
-            <LineChart fx:id="chart" animated="false" prefHeight="407.0" prefWidth="476.0" visible="false" HBox.hgrow="ALWAYS">
+            <LineChart fx:id="chart" animated="false" visible="false" HBox.hgrow="ALWAYS">
                 <xAxis>
                     <NumberAxis animated="false" forceZeroInRange="false" label="Date" side="BOTTOM" />
                 </xAxis>
                 <yAxis>
                     <NumberAxis animated="false" forceZeroInRange="false" label="Glycemia (mg/dl)" side="LEFT" tickMarkVisible="false" upperBound="400.0" />
                 </yAxis>
+            <HBox.margin>
+               <Insets />
+            </HBox.margin>
+            <padding>
+               <Insets right="35.0" />
+            </padding>
             </LineChart>
         </children>
     </HBox>
